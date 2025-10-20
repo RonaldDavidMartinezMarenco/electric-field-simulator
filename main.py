@@ -11,15 +11,15 @@ app = FastAPI(
     description="Simulate electric fields from point charges"
 )
 
-# ✅ CORS: Allow requests from anywhere (frontend will be on Vercel domain)
+# ✅ CORS: Allow requests from anywhere
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",           # Local development
-        "http://localhost:8000",           # Local frontend
-        "http://localhost:5173",           # Vite dev server
-        "https://*.vercel.app",            # All Vercel deployments
-        "https://*.netlify.app",           # Alternative: Netlify
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:5173",
+        "https://*.vercel.app",
+        "https://*.netlify.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -45,15 +45,13 @@ def root():
     }
 
 # ✅ Include simulation routes
-# ✅ Router should have /simulate/2d endpoint
 app.include_router(
     simulate_2d_router,
-    prefix="",  # No prefix, routes are at root level
+    prefix="",
     tags=["Simulation"]
 )
 
 # ✅ Vercel serverless handler
-# This is what Vercel calls to handle requests
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
