@@ -8,16 +8,38 @@
         "maxLambdaSize": "50mb",
         "runtime": "python3.11"
       }
+    },
+    {
+      "src": "app/web",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "app/web"
+      }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/simulate/(.*)",
       "dest": "main.py"
+    },
+    {
+      "src": "/health",
+      "dest": "main.py"
+    },
+    {
+      "src": "/docs",
+      "dest": "main.py"
+    },
+    {
+      "src": "/openapi.json",
+      "dest": "main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/app/web/$1"
     }
   ],
   "env": {
     "PYTHONUNBUFFERED": "1"
   }
 }
-

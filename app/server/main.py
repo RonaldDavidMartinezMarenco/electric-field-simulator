@@ -44,7 +44,7 @@ def root():
         "health": "/health"
     }
 
-# ✅ Include simulation routes
+# ✅ Include simulation routes - THIS IS THE IMPORTANT PART
 app.include_router(
     simulate_2d_router,
     prefix="",
