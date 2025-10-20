@@ -1,13 +1,34 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 .Python
 env/
 venv/
-.env
 .venv
 *.egg-info/
 dist/
 build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Vercel
 .vercel/
+
+# Node
 node_modules/
+npm-debug.log
+
+# OS
+.DS_Store
+Thumbs.db
