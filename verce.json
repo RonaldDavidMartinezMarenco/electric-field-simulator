@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app/server/main.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "50mb" }
+    },
+    {
+      "src": "app/web",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "app/web" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/simulate/(.*)",
+      "dest": "app/server/main.py"
+    },
+    {
+      "src": "/health",
+      "dest": "app/server/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app/web/$1"
+    }
+  ],
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  }
+}
