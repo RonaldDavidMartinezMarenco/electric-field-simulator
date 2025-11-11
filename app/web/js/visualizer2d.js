@@ -60,14 +60,24 @@ class Visualizer2D {
         const worldCoords = this.pixelToWorld(pixelX, pixelY);
         const chargeData = JSON.parse(sessionStorage.getItem("chargeData") || "[]");
         
-        chargeData[this.draggedChargeId].x = worldCoords.x;
-        chargeData[this.draggedChargeId].y = worldCoords.y;
+        // ✅ Get grid limits
+        const xmin = parseFloat(document.getElementById("xmin").value);
+        const xmax = parseFloat(document.getElementById("xmax").value);
+        const ymin = parseFloat(document.getElementById("ymin").value);
+        const ymax = parseFloat(document.getElementById("ymax").value);
+        
+        // ✅ Clamp to grid boundaries
+        const clampedX = Math.max(xmin, Math.min(xmax, worldCoords.x));
+        const clampedY = Math.max(ymin, Math.min(ymax, worldCoords.y));
+        
+        chargeData[this.draggedChargeId].x = clampedX;
+        chargeData[this.draggedChargeId].y = clampedY;
         sessionStorage.setItem("chargeData", JSON.stringify(chargeData));
         
         const chargeElements = document.querySelectorAll(".charge-item");
         if (chargeElements[this.draggedChargeId]) {
-            chargeElements[this.draggedChargeId].querySelector(".charge-x").value = worldCoords.x.toFixed(2);
-            chargeElements[this.draggedChargeId].querySelector(".charge-y").value = worldCoords.y.toFixed(2);
+            chargeElements[this.draggedChargeId].querySelector(".charge-x").value = clampedX.toFixed(2);
+            chargeElements[this.draggedChargeId].querySelector(".charge-y").value = clampedY.toFixed(2);
         }
         
         this.triggerSimulation();
@@ -595,4 +605,104 @@ class Visualizer2D {
         const btn = document.getElementById("run-simulation-btn");
         btn.click();
     }
+
+    drawChargesOnly() {
+        const chargeData = JSON.parse(sessionStorage.getItem("chargeData") || "[]");
+        
+        // Get grid limits (or use defaults)
+        const xminInput = document.getElementById("xmin");
+        const xmaxInput = document.getElementById("xmax");
+        const yminInput = document.getElementById("ymin");
+        const ymaxInput = document.getElementById("ymax");
+        
+        const xmin = xminInput ? parseFloat(xminInput.value) : -1.0;
+        const xmax = xmaxInput ? parseFloat(xmaxInput.value) : 1.0;
+        const ymin = yminInput ? parseFloat(yminInput.value) : -1.0;
+        const ymax = ymaxInput ? parseFloat(ymaxInput.value) : 1.0;
+        
+        // ✅ Create fake grid for worldToPixel
+        this.data = {
+            grid: { xmin, xmax, ymin, ymax, nx: 41, ny: 41 }
+        };
+        
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw grid
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.ctx.lineWidth = 1;
+        
+        // Vertical lines
+        for (let x = 0; x <= this.canvas.width; x += 50) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, this.canvas.height);
+            this.ctx.stroke();
+        }
+        
+        // Horizontal lines
+        for (let y = 0; y <= this.canvas.height; y += 50) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(this.canvas.width, y);
+            this.ctx.stroke();
+        }
+        
+        // Draw axes
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        
+        this.ctx.strokeStyle = "#666";
+        this.ctx.lineWidth = 2;
+        
+        // X axis
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, centerY);
+        this.ctx.lineTo(this.canvas.width, centerY);
+        this.ctx.stroke();
+        
+        // Y axis
+        this.ctx.beginPath();
+        this.ctx.moveTo(centerX, 0);
+        this.ctx.lineTo(centerX, this.canvas.height);
+        this.ctx.stroke();
+        
+        // Draw grid boundary
+        this.ctx.strokeStyle = "#999999";
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw charges
+        for (let i = 0; i < chargeData.length; i++) {
+            const charge = chargeData[i];
+            const screenCoords = this.worldToPixel(charge.x, charge.y);
+            
+            const radius = 22;
+            
+            // Determine color based on charge sign
+            const color = charge.q > 0 ? "#ff4444" : "#4444ff";
+            
+            // Draw charge circle
+            this.ctx.fillStyle = color;
+            this.ctx.beginPath();
+            this.ctx.arc(screenCoords.x, screenCoords.y, radius, 0, 2 * Math.PI);
+            this.ctx.fill();
+            
+            // Draw white border
+            this.ctx.strokeStyle = "#000000";
+            this.ctx.lineWidth = 3;
+            this.ctx.stroke();
+            
+            // Draw +/- sign
+            this.ctx.fillStyle = "white";
+            this.ctx.font = "bold 32px Arial";
+            this.ctx.textAlign = "center";
+            this.ctx.textBaseline = "middle";
+            const sign = charge.q > 0 ? "+" : "−";
+            this.ctx.fillText(sign, screenCoords.x, screenCoords.y);
+        }
+        
+        console.log(`✅ Drew ${chargeData.length} charges on canvas (grid: [${xmin}, ${xmax}] × [${ymin}, ${ymax}])`);
+    }
+
 }

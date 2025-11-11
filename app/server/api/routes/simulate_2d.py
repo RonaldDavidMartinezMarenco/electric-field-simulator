@@ -3,7 +3,7 @@ from app.server.schemas.simulation import Simulation2DRequest, Simulation2DRespo
 from app.server.simulations.sim2d.solver import compute_field_2d
 import json 
 
-router = APIRouter(tags=["simulation"])
+router = APIRouter()
 
 @router.post("/simulate/2d", response_model=Simulation2DResponse)
 def simulate_2d(body: Simulation2DRequest) -> Simulation2DResponse:

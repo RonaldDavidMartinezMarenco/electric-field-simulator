@@ -24,6 +24,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("add-charge-btn").addEventListener("click", addCharge);
     document.getElementById("run-simulation-btn").addEventListener("click", runSimulation);
 
+    // Listeners para cambios en grid (actualiza botón)
+    document.getElementById("xmin").addEventListener("change", updateChargeInputLimits);
+    document.getElementById("xmax").addEventListener("change", updateChargeInputLimits);
+    document.getElementById("ymin").addEventListener("change", updateChargeInputLimits);
+    document.getElementById("ymax").addEventListener("change", updateChargeInputLimits);
+    
+    //También al escribir (input event)
+    document.getElementById("xmin").addEventListener("input", updateAddChargeButton);
+    document.getElementById("xmax").addEventListener("input", updateAddChargeButton);
+    document.getElementById("ymin").addEventListener("input", updateAddChargeButton);
+    document.getElementById("ymax").addEventListener("input", updateAddChargeButton);
+
     // Checkbox listeners for visualization options
     document.getElementById("show-field-lines-2d").addEventListener("change", updateVisualization);
     document.getElementById("show-potential-2d").addEventListener("change", updateVisualization);
@@ -35,17 +47,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (equipotentialCheckbox) {
         equipotentialCheckbox.addEventListener("change", updateVisualization);
     }
-
-    // Initialize with two default charges
-    addCharge(-0.5, 0, 1e-9);
-    addCharge(0.5, 0, -1e-9);
     handleModeChange();
+
+    const xmin = parseFloat(document.getElementById("xmin").value);
+    const xmax = parseFloat(document.getElementById("xmax").value);
+    const ymin = parseFloat(document.getElementById("ymin").value);
+    const ymax = parseFloat(document.getElementById("ymax").value);
+    
+    const centerX = (xmin + xmax) / 2;
+    const centerY = (ymin + ymax) / 2;
+    
+    addCharge(centerX, centerY, 1e-9);
+
+    //Check initial button state
+    updateAddChargeButton();
 
     // Add event listener for measure button
     document.getElementById("measure-btn").addEventListener("click", toggleMeasureTool);
 
     // Add event listener for equipotential button
     document.getElementById("equipotential-btn").addEventListener("click", toggleEquipotentialTool);
+    showStatus("✓ Ready! Add charges and click 'Run Simulation' to start", "success");
 });
 
 /**
@@ -66,19 +88,116 @@ function handleModeChange() {
 }
 
 /**
- * Add a new charge input with smart defaults
+ * Update charge data in sessionStorage from DOM
  */
+function updateChargeData() {
+    const chargeElements = document.querySelectorAll(".charge-item");
+    const chargesData = Array.from(chargeElements).map((el) => {
+        const x = parseFloat(el.querySelector(".charge-x").value);
+        const y = parseFloat(el.querySelector(".charge-y").value);
+        const q = parseFloat(el.querySelector(".charge-q").value);
+        return { x, y, q };
+    });
+    
+    sessionStorage.setItem("chargeData", JSON.stringify(chargesData));
+    console.log("📊 Charge data updated:", chargesData);
+}
+
+function validateGridForNewCharge() {
+    const xmin = parseFloat(document.getElementById("xmin").value);
+    const xmax = parseFloat(document.getElementById("xmax").value);
+    const ymin = parseFloat(document.getElementById("ymin").value);
+    const ymax = parseFloat(document.getElementById("ymax").value);
+    
+    // Check if grid is valid
+    if (isNaN(xmin) || isNaN(xmax) || isNaN(ymin) || isNaN(ymax)) {
+        return {
+            valid: false,
+            message: "⚠️ Grid settings are invalid. Please set valid X and Y ranges."
+        };
+    }
+    
+    if (xmin >= xmax) {
+        return {
+            valid: false,
+            message: "⚠️ X min must be less than X max"
+        };
+    }
+    
+    if (ymin >= ymax) {
+        return {
+            valid: false,
+            message: "⚠️ Y min must be less than Y max"
+        };
+    }
+    
+    // ✅ Solo valida que el grid sea válido, no la posición de la próxima carga
+    return { valid: true };
+}
+
+function updateAddChargeButton() {
+    const addBtn = document.getElementById("add-charge-btn");
+    const validation = validateGridForNewCharge();
+    
+    if (!validation.valid) {
+        addBtn.disabled = true;
+        addBtn.style.opacity = "0.5";
+        addBtn.style.cursor = "not-allowed";
+        addBtn.title = validation.message;
+        showStatus(validation.message, "error");
+    } else {
+        addBtn.disabled = false;
+        addBtn.style.opacity = "1";
+        addBtn.style.cursor = "pointer";
+        addBtn.title = "Add a new charge";
+    }
+}
+
 function addCharge(x = null, y = null, q = null) {
+    // ✅ Validate grid is valid
+    const validation = validateGridForNewCharge();
+    if (!validation.valid) {
+        showStatus(validation.message, "error");
+        return;
+    }
+    
     const chargesList = document.getElementById("charges-list");
     const chargeId = charges.length;
     
+    // Get current grid limits
+    const xmin = parseFloat(document.getElementById("xmin").value);
+    const xmax = parseFloat(document.getElementById("xmax").value);
+    const ymin = parseFloat(document.getElementById("ymin").value);
+    const ymax = parseFloat(document.getElementById("ymax").value);
+    
     // Smart defaults based on charge number
     if (x === null || isNaN(x)) {
-        x = -0.5 + (chargeId * 0.5);  // -0.5, 0, 0.5, 1.0, ...
+        const centerX = (xmin + xmax) / 2;
+        const rangeX = xmax - xmin;
+        
+        // ✅ Distribuir cargas más inteligentemente
+        if (chargeId === 0) {
+            // Primera carga en el centro
+            x = centerX;
+        } else {
+            // Siguiente carga: alternar izquierda/derecha del centro
+            const offset = Math.ceil(chargeId / 2) * (rangeX / 8);
+            x = chargeId % 2 === 0 ? centerX + offset : centerX - offset;
+        }
+        
+        // Clamp to grid
+        x = Math.max(xmin + 0.1 * rangeX, Math.min(xmax - 0.1 * rangeX, x));
     }
+    
     if (y === null || isNaN(y)) {
-        y = 0;
+        const centerY = (ymin + ymax) / 2;
+        const rangeY = ymax - ymin;
+        
+        // ✅ Variar Y para que no se superpongan
+        y = centerY + (Math.random() - 0.5) * rangeY * 0.2;
+        y = Math.max(ymin + 0.1 * rangeY, Math.min(ymax - 0.1 * rangeY, y));
     }
+    
     if (q === null || isNaN(q)) {
         q = chargeId % 2 === 0 ? 1e-9 : -1e-9;  // Alternate +/- charges
     }
@@ -93,30 +212,200 @@ function addCharge(x = null, y = null, q = null) {
             <label><strong>Charge ${chargeId + 1}</strong></label>
             <div style="margin-bottom: 8px;">
                 <label style="display: inline; margin-right: 5px;">X (m):</label>
-                <input type="number" class="charge-x" placeholder="X position" value="${x}" step="0.1" required>
+                <input 
+                    type="number" 
+                    class="charge-x" 
+                    placeholder="X position" 
+                    value="${x.toFixed(2)}" 
+                    step="0.1" 
+                    min="${xmin}" 
+                    max="${xmax}"
+                    oninput="validateChargePosition(this, ${chargeId})"
+                    required>
             </div>
             <div style="margin-bottom: 8px;">
                 <label style="display: inline; margin-right: 5px;">Y (m):</label>
-                <input type="number" class="charge-y" placeholder="Y position" value="${y}" step="0.1" required>
+                <input 
+                    type="number" 
+                    class="charge-y" 
+                    placeholder="Y position" 
+                    value="${y.toFixed(2)}" 
+                    step="0.1" 
+                    min="${ymin}" 
+                    max="${ymax}"
+                    oninput="validateChargePosition(this, ${chargeId})"
+                    required>
             </div>
             <div style="margin-bottom: 8px;">
                 <label style="display: inline; margin-right: 5px;">Q (C):</label>
-                <input type="number" class="charge-q" placeholder="Charge" value="${q}" step="1e-9" required>
+                <input 
+                    type="number" 
+                    class="charge-q" 
+                    placeholder="Charge" 
+                    value="${q}" 
+                    step="1e-9" 
+                    required>
             </div>
         </div>
         <button type="button" onclick="removeCharge(${chargeId})" style="align-self: flex-start;">✕ Remove</button>
     `;
 
     chargesList.appendChild(chargeItem);
+
+    // Update sessionStorage immediately
+    updateChargeData();
+    
+    // Draw charges immediately
+    const stored = sessionStorage.getItem("lastResult");
+    if (stored && visualizer2D && visualizer2D.data) {
+        visualizer2D.render(visualizer2D.data, visualizer2D.currentOptions);
+    } 
+    
+    //Update button state for next charge
+    updateAddChargeButton();
+    
+    showStatus(`✓ Charge ${chargeId + 1} added at (${x.toFixed(2)}, ${y.toFixed(2)})`, "success");
 }
 
+
+function updateChargeInputLimits() {
+    const xmin = parseFloat(document.getElementById("xmin").value);
+    const xmax = parseFloat(document.getElementById("xmax").value);
+    const ymin = parseFloat(document.getElementById("ymin").value);
+    const ymax = parseFloat(document.getElementById("ymax").value);
+    
+    // Update all charge inputs
+    const chargeElements = document.querySelectorAll(".charge-item");
+    chargeElements.forEach((el) => {
+        const xInput = el.querySelector(".charge-x");
+        const yInput = el.querySelector(".charge-y");
+        
+        // Update min/max attributes
+        xInput.setAttribute("min", xmin);
+        xInput.setAttribute("max", xmax);
+        yInput.setAttribute("min", ymin);
+        yInput.setAttribute("max", ymax);
+        
+        // Clamp current values
+        const currentX = parseFloat(xInput.value);
+        const currentY = parseFloat(yInput.value);
+        
+        if (currentX < xmin) xInput.value = xmin;
+        if (currentX > xmax) xInput.value = xmax;
+        if (currentY < ymin) yInput.value = ymin;
+        if (currentY > ymax) yInput.value = ymax;
+    });
+    
+    // Update visualization
+    updateChargeData();
+    if (visualizer2D) {
+        const stored = sessionStorage.getItem("lastResult");
+        if (stored && visualizer2D.data) {
+            visualizer2D.render(visualizer2D.data, visualizer2D.currentOptions);
+        } else {
+            visualizer2D.drawChargesOnly();
+        }
+    }
+    
+    // Check if add charge button should be enabled/disabled
+    updateAddChargeButton();
+}
 /**
- * Remove a charge
+ * Add a new charge input with smart defaults
  */
+
+
+function validateChargePosition(input, chargeId) {
+    const xmin = parseFloat(document.getElementById("xmin").value);
+    const xmax = parseFloat(document.getElementById("xmax").value);
+    const ymin = parseFloat(document.getElementById("ymin").value);
+    const ymax = parseFloat(document.getElementById("ymax").value);
+    
+    const value = parseFloat(input.value);
+    const isXInput = input.classList.contains("charge-x");
+    const isYInput = input.classList.contains("charge-y");
+    
+    // Get limits for this input
+    const min = isXInput ? xmin : (isYInput ? ymin : -Infinity);
+    const max = isXInput ? xmax : (isYInput ? ymax : Infinity);
+    
+    // Clamp value
+    if (value < min) {
+        input.value = min;
+        showStatus(`⚠️ Charge ${chargeId + 1}: ${isXInput ? 'X' : 'Y'} clamped to grid minimum (${min})`, "error");
+    } else if (value > max) {
+        input.value = max;
+        showStatus(`⚠️ Charge ${chargeId + 1}: ${isXInput ? 'X' : 'Y'} clamped to grid maximum (${max})`, "error");
+    }
+    
+    // Update visualization
+    updateChargeData();
+    const stored = sessionStorage.getItem("lastResult");
+    if (stored && visualizer2D && visualizer2D.data) {
+        visualizer2D.render(visualizer2D.data, visualizer2D.currentOptions);
+    } else if (visualizer2D) {
+        visualizer2D.drawChargesOnly();
+    }
+}
+
+function updateChargeInputLimits() {
+    const xmin = parseFloat(document.getElementById("xmin").value);
+    const xmax = parseFloat(document.getElementById("xmax").value);
+    const ymin = parseFloat(document.getElementById("ymin").value);
+    const ymax = parseFloat(document.getElementById("ymax").value);
+    
+    // Update all charge inputs
+    const chargeElements = document.querySelectorAll(".charge-item");
+    chargeElements.forEach((el) => {
+        const xInput = el.querySelector(".charge-x");
+        const yInput = el.querySelector(".charge-y");
+        
+        // Update min/max attributes
+        xInput.setAttribute("min", xmin);
+        xInput.setAttribute("max", xmax);
+        yInput.setAttribute("min", ymin);
+        yInput.setAttribute("max", ymax);
+        
+        // Clamp current values
+        const currentX = parseFloat(xInput.value);
+        const currentY = parseFloat(yInput.value);
+        
+        if (currentX < xmin) xInput.value = xmin;
+        if (currentX > xmax) xInput.value = xmax;
+        if (currentY < ymin) yInput.value = ymin;
+        if (currentY > ymax) yInput.value = ymax;
+    });
+    
+    // Update visualization
+    updateChargeData();
+    if (visualizer2D) {
+        const stored = sessionStorage.getItem("lastResult");
+        if (stored && visualizer2D.data) {
+            visualizer2D.render(visualizer2D.data, visualizer2D.currentOptions);
+        } else {
+            visualizer2D.drawChargesOnly();
+        }
+    }
+}
+
 function removeCharge(chargeId) {
     const chargeItem = document.getElementById(`charge-${chargeId}`);
     if (chargeItem) chargeItem.remove();
     charges = charges.filter(c => c.id !== chargeId);
+    
+    // Update sessionStorage
+    updateChargeData();
+    
+    // Re-dibujar
+    const stored = sessionStorage.getItem("lastResult");
+    if (stored && visualizer2D && visualizer2D.data) {
+        visualizer2D.render(visualizer2D.data, visualizer2D.currentOptions);
+    } else if (visualizer2D) {
+        visualizer2D.drawChargesOnly();
+    }
+    
+    // Update button state (may be enabled now)
+    updateAddChargeButton();
 }
 
 /**
@@ -261,7 +550,7 @@ function toggleMeasureTool() {
         // Disable measure mode - CLEAR the measurement point
         btn.style.background = "#667eea";
         visualizer2D.canvas.removeEventListener("click", handleMeasureClick);
-        visualizer2D.measurePoint = null;  // ✅ Clear the measurement
+        visualizer2D.measurePoint = null;  // Clear the measurement
         
         // Re-render to remove crosshair
         if (visualizer2D.data) {

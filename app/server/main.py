@@ -1,9 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import sys 
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import your router
 from app.server.api.routes.simulate_2d import router as simulate_2d_router
+from app.server.api.routes.simulate_3d import router as simulate_3d_router
+
 
 app = FastAPI(
     title="⚡ Electric Field Simulator",
@@ -14,13 +20,7 @@ app = FastAPI(
 # ✅ CORS: Allow requests from anywhere
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://localhost:5173",
-        "https://*.vercel.app",
-        "https://*.netlify.app",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,7 +35,7 @@ def health():
         "message": "⚡ Electric Field Simulator Backend Running"
     }
 
-# ✅ Root endpoint
+# Root endpoint
 @app.get("/", include_in_schema=False)
 def root():
     return {
@@ -44,14 +44,19 @@ def root():
         "health": "/health"
     }
 
-# ✅ Include simulation routes - THIS IS THE IMPORTANT PART
+# Include simulation routes - THIS IS THE IMPORTANT PART
 app.include_router(
     simulate_2d_router,
     prefix="",
     tags=["Simulation"]
 )
 
-# ✅ Vercel serverless handler
+app.include_router(
+    simulate_3d_router,
+    prefix="",
+    tags=["Simulation"]
+)
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
