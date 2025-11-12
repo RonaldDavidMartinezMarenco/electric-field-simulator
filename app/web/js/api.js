@@ -7,11 +7,11 @@ function initializeAPI() {
     if (hostname === "localhost" || hostname === "127.0.0.1") {
         // 🖥️ Local
         API_BASE_URL = "http://localhost:8000";
-        console.log("🖥️ Using local backend:", API_BASE_URL);
+        console.log("Using local backend:", API_BASE_URL);
     } else {
         // ☁️ Vercel (same domain)
         API_BASE_URL = `${protocol}//${hostname}`;
-        console.log("☁️ Using Vercel backend:", API_BASE_URL);
+        console.log("Using Vercel backend:", API_BASE_URL);
     }
 }
 
@@ -57,16 +57,26 @@ async function simulate2D(requestData) {
 async function simulate3D(requestData) {
     try {
         const url = `${API_BASE_URL}/simulate/3d`;
+        console.log("📡 Calling 3D:", url); 
         const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(requestData),
         });
+        
+        // ❌ BUG: Este if está mal ubicado
         if (!response.ok) {
-            return simulate2D(requestData);
+            const error = await response.json();
+            console.error("❌ Backend error:", error);
+            throw new Error(error.detail || "3D Simulation failed");
         }
-        return await response.json();
+        
+        const result = await response.json();
+        console.log("✅ 3D Simulation successful");
+        return result;
+        
     } catch (error) {
-        return simulate2D(requestData);
+        console.error("❌ API Error:", error);
+        throw error;
     }
 }

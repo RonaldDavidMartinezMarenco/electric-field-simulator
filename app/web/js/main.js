@@ -77,13 +77,28 @@ function handleModeChange() {
     const mode = document.getElementById("mode").value;
     const container2D = document.getElementById("canvas-2d-container");
     const container3D = document.getElementById("canvas-3d-container");
+    
+    // ✅ Mostrar/ocultar campos Z
+    const zRangeContainer = document.getElementById("z-range-container");
+    const nzInput = document.getElementById("nz");
+    const nzLabel = document.getElementById("nz-label");
 
     if (mode === "2d") {
         container2D.style.display = "block";
         container3D.style.display = "none";
+        
+        // ✅ Ocultar campos Z
+        if (zRangeContainer) zRangeContainer.style.display = "none";
+        if (nzInput) nzInput.style.display = "none";
+        if (nzLabel) nzLabel.style.display = "none";
     } else {
         container2D.style.display = "none";
         container3D.style.display = "block";
+        
+        // ✅ Mostrar campos Z
+        if (zRangeContainer) zRangeContainer.style.display = "block";
+        if (nzInput) nzInput.style.display = "inline-block";
+        if (nzLabel) nzLabel.style.display = "inline";
     }
 }
 
@@ -91,12 +106,22 @@ function handleModeChange() {
  * Update charge data in sessionStorage from DOM
  */
 function updateChargeData() {
+    const mode = document.getElementById("mode").value;
     const chargeElements = document.querySelectorAll(".charge-item");
+    
     const chargesData = Array.from(chargeElements).map((el) => {
         const x = parseFloat(el.querySelector(".charge-x").value);
         const y = parseFloat(el.querySelector(".charge-y").value);
         const q = parseFloat(el.querySelector(".charge-q").value);
-        return { x, y, q };
+        
+        // ✅ Get Z for 3D
+        let z = 0;
+        if (mode === "3d") {
+            const zInput = el.querySelector(".charge-z");
+            z = zInput ? parseFloat(zInput.value) : 0;
+        }
+        
+        return { x, y, z, q };
     });
     
     sessionStorage.setItem("chargeData", JSON.stringify(chargesData));
@@ -153,8 +178,7 @@ function updateAddChargeButton() {
     }
 }
 
-function addCharge(x = null, y = null, q = null) {
-    // ✅ Validate grid is valid
+function addCharge(x = null, y = null, z = null, q = null) {
     const validation = validateGridForNewCharge();
     if (!validation.valid) {
         showStatus(validation.message, "error");
@@ -163,6 +187,7 @@ function addCharge(x = null, y = null, q = null) {
     
     const chargesList = document.getElementById("charges-list");
     const chargeId = charges.length;
+    const mode = document.getElementById("mode").value;
     
     // Get current grid limits
     const xmin = parseFloat(document.getElementById("xmin").value);
@@ -170,44 +195,55 @@ function addCharge(x = null, y = null, q = null) {
     const ymin = parseFloat(document.getElementById("ymin").value);
     const ymax = parseFloat(document.getElementById("ymax").value);
     
-    // Smart defaults based on charge number
+    // ✅ Get Z limits for 3D
+    let zmin = 0, zmax = 0;
+    if (mode === "3d") {
+        zmin = parseFloat(document.getElementById("zmin").value);
+        zmax = parseFloat(document.getElementById("zmax").value);
+    }
+    
+    // Smart defaults
     if (x === null || isNaN(x)) {
         const centerX = (xmin + xmax) / 2;
         const rangeX = xmax - xmin;
         
-        // ✅ Distribuir cargas más inteligentemente
         if (chargeId === 0) {
-            // Primera carga en el centro
             x = centerX;
         } else {
-            // Siguiente carga: alternar izquierda/derecha del centro
             const offset = Math.ceil(chargeId / 2) * (rangeX / 8);
             x = chargeId % 2 === 0 ? centerX + offset : centerX - offset;
         }
         
-        // Clamp to grid
         x = Math.max(xmin + 0.1 * rangeX, Math.min(xmax - 0.1 * rangeX, x));
     }
     
     if (y === null || isNaN(y)) {
         const centerY = (ymin + ymax) / 2;
         const rangeY = ymax - ymin;
-        
-        // ✅ Variar Y para que no se superpongan
         y = centerY + (Math.random() - 0.5) * rangeY * 0.2;
         y = Math.max(ymin + 0.1 * rangeY, Math.min(ymax - 0.1 * rangeY, y));
     }
     
-    if (q === null || isNaN(q)) {
-        q = chargeId % 2 === 0 ? 1e-9 : -1e-9;  // Alternate +/- charges
+    // ✅ Z coordinate for 3D
+    if (mode === "3d") {
+        if (z === null || isNaN(z)) {
+            const centerZ = (zmin + zmax) / 2;
+            const rangeZ = zmax - zmin;
+            z = centerZ + (Math.random() - 0.5) * rangeZ * 0.2;
+            z = Math.max(zmin + 0.1 * rangeZ, Math.min(zmax - 0.1 * rangeZ, z));
+        }
+    } else {
+        z = 0; // Default Z=0 for 2D
     }
     
-    charges.push({ x, y, q, id: chargeId });
+    if (q === null || isNaN(q)) {
+        q = chargeId % 2 === 0 ? 1e-9 : -1e-9;
+    }
+    
+    charges.push({ x, y, z, q, id: chargeId });
 
-    const chargeItem = document.createElement("div");
-    chargeItem.className = "charge-item";
-    chargeItem.id = `charge-${chargeId}`;
-    chargeItem.innerHTML = `
+    // ✅ Build charge item HTML with conditional Z input
+    let chargeHTML = `
         <div>
             <label><strong>Charge ${chargeId + 1}</strong></label>
             <div style="margin-bottom: 8px;">
@@ -215,7 +251,6 @@ function addCharge(x = null, y = null, q = null) {
                 <input 
                     type="number" 
                     class="charge-x" 
-                    placeholder="X position" 
                     value="${x.toFixed(2)}" 
                     step="0.1" 
                     min="${xmin}" 
@@ -228,20 +263,37 @@ function addCharge(x = null, y = null, q = null) {
                 <input 
                     type="number" 
                     class="charge-y" 
-                    placeholder="Y position" 
                     value="${y.toFixed(2)}" 
                     step="0.1" 
                     min="${ymin}" 
                     max="${ymax}"
                     oninput="validateChargePosition(this, ${chargeId})"
                     required>
-            </div>
+            </div>`;
+    
+    // ✅ Add Z input only in 3D mode
+    if (mode === "3d") {
+        chargeHTML += `
+            <div style="margin-bottom: 8px;">
+                <label style="display: inline; margin-right: 5px;">Z (m):</label>
+                <input 
+                    type="number" 
+                    class="charge-z" 
+                    value="${z.toFixed(2)}" 
+                    step="0.1" 
+                    min="${zmin}" 
+                    max="${zmax}"
+                    oninput="validateChargePosition(this, ${chargeId})"
+                    required>
+            </div>`;
+    }
+    
+    chargeHTML += `
             <div style="margin-bottom: 8px;">
                 <label style="display: inline; margin-right: 5px;">Q (C):</label>
                 <input 
                     type="number" 
                     class="charge-q" 
-                    placeholder="Charge" 
                     value="${q}" 
                     step="1e-9" 
                     required>
@@ -250,21 +302,17 @@ function addCharge(x = null, y = null, q = null) {
         <button type="button" onclick="removeCharge(${chargeId})" style="align-self: flex-start;">✕ Remove</button>
     `;
 
-    chargesList.appendChild(chargeItem);
+    const chargeItem = document.createElement("div");
+    chargeItem.className = "charge-item";
+    chargeItem.id = `charge-${chargeId}`;
+    chargeItem.innerHTML = chargeHTML;
 
-    // Update sessionStorage immediately
+    chargesList.appendChild(chargeItem);
     updateChargeData();
-    
-    // Draw charges immediately
-    const stored = sessionStorage.getItem("lastResult");
-    if (stored && visualizer2D && visualizer2D.data) {
-        visualizer2D.render(visualizer2D.data, visualizer2D.currentOptions);
-    } 
-    
-    //Update button state for next charge
     updateAddChargeButton();
     
-    showStatus(`✓ Charge ${chargeId + 1} added at (${x.toFixed(2)}, ${y.toFixed(2)})`, "success");
+    const zStr = mode === "3d" ? `, ${z.toFixed(2)}` : '';
+    showStatus(`✓ Charge ${chargeId + 1} added at (${x.toFixed(2)}, ${y.toFixed(2)}${zStr})`, "success");
 }
 
 
@@ -412,7 +460,9 @@ function removeCharge(chargeId) {
  * Collect form data with validation
  */
 function collectFormData() {
-    // Validate grid
+    const mode = document.getElementById("mode").value;
+    
+    // ✅ Base grid (2D)
     const grid = {
         xmin: parseFloat(document.getElementById("xmin").value),
         xmax: parseFloat(document.getElementById("xmax").value),
@@ -421,16 +471,30 @@ function collectFormData() {
         nx: parseInt(document.getElementById("nx").value),
         ny: parseInt(document.getElementById("ny").value),
     };
+    
+    // ✅ Add Z for 3D
+    if (mode === "3d") {
+        grid.zmin = parseFloat(document.getElementById("zmin").value);
+        grid.zmax = parseFloat(document.getElementById("zmax").value);
+        grid.nz = parseInt(document.getElementById("nz").value);
+        
+        if (isNaN(grid.zmin) || isNaN(grid.zmax)) {
+            throw new Error("Invalid Z range for 3D simulation");
+        }
+        if (isNaN(grid.nz) || grid.nz < 2) {
+            throw new Error("Z resolution must be at least 2");
+        }
+    }
 
-    // Check grid values
+    // Validate base grid
     if (isNaN(grid.xmin) || isNaN(grid.xmax) || isNaN(grid.ymin) || isNaN(grid.ymax)) {
-        throw new Error("Invalid grid values. Check that all grid fields are numbers.");
+        throw new Error("Invalid grid values");
     }
     if (isNaN(grid.nx) || isNaN(grid.ny) || grid.nx < 2 || grid.ny < 2) {
         throw new Error("Grid resolution must be at least 2x2");
     }
 
-    // Charges - read from DOM and validate
+    // ✅ Collect charges with Z coordinate
     const chargeElements = document.querySelectorAll(".charge-item");
     if (chargeElements.length === 0) {
         throw new Error("At least one charge is required");
@@ -441,16 +505,22 @@ function collectFormData() {
         const y = parseFloat(el.querySelector(".charge-y").value);
         const q = parseFloat(el.querySelector(".charge-q").value);
         
-        // Detailed validation
-        if (isNaN(x)) throw new Error(`Charge ${idx + 1}: X position is not a valid number`);
-        if (isNaN(y)) throw new Error(`Charge ${idx + 1}: Y position is not a valid number`);
-        if (isNaN(q)) throw new Error(`Charge ${idx + 1}: Charge magnitude is not a valid number`);
+        // ✅ Get Z for 3D
+        let z = 0;
+        if (mode === "3d") {
+            const zInput = el.querySelector(".charge-z");
+            z = zInput ? parseFloat(zInput.value) : 0;
+            if (isNaN(z)) throw new Error(`Charge ${idx + 1}: Z position is not valid`);
+        }
+        
+        if (isNaN(x)) throw new Error(`Charge ${idx + 1}: X position is not valid`);
+        if (isNaN(y)) throw new Error(`Charge ${idx + 1}: Y position is not valid`);
+        if (isNaN(q)) throw new Error(`Charge ${idx + 1}: Charge is not valid`);
         if (q === 0) throw new Error(`Charge ${idx + 1}: Charge cannot be zero`);
         
-        return { x, y, q };
+        return { x, y, z, q };
     });
 
-    // Save charges to session for visualization
     sessionStorage.setItem("chargeData", JSON.stringify(chargesData));
 
     return {
@@ -460,6 +530,7 @@ function collectFormData() {
         include_potential: document.getElementById("include-potential").checked,
     };
 }
+
 
 /**
  * Run simulation
