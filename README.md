@@ -100,7 +100,7 @@ para visualizar el simulador en acción.
 
 ## 🚀 Créditos
 
-Desarrollado con ❤️ por [Tu Nombre o Equipo]  
+Desarrollado con ❤️ por [MARTINEZ MARENCO RONALD DAVID Y MI TEAM :D]  
 Potenciado por **Three.js**, **FastAPI** y **uv**.  
 
 ---
