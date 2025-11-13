@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys 
 from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -11,13 +13,16 @@ from app.server.api.routes.simulate_2d import router as simulate_2d_router
 from app.server.api.routes.simulate_3d import router as simulate_3d_router
 
 
+frontend_path = Path(__file__).parent.parent / "web"
+
 app = FastAPI(
     title="⚡ Electric Field Simulator",
     version="0.1.0",
     description="Simulate electric fields from point charges"
 )
 
-# ✅ CORS: Allow requests from anywhere
+app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,6 +30,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def serve_frontend():
+    return FileResponse(frontend_path / "index.html")
 
 # ✅ Health check endpoint
 @app.get("/health")
@@ -35,8 +44,8 @@ def health():
         "message": "⚡ Electric Field Simulator Backend Running"
     }
 
-# Root endpoint
-@app.get("/", include_in_schema=False)
+# info endpoint
+@app.get("/info", include_in_schema=False)
 def root():
     return {
         "message": "⚡ Electric Field Simulator API",
