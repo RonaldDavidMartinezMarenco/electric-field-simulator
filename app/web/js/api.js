@@ -9,9 +9,8 @@ function initializeAPI() {
         API_BASE_URL = "http://localhost:8000";
         console.log("Using local backend:", API_BASE_URL);
     } else {
-        // ☁️ Vercel (same domain)
-        API_BASE_URL = `${protocol}//${hostname}`;
-        console.log("Using Vercel backend:", API_BASE_URL);
+        API_BASE_URL = "https://electric-field-simulator.onrender.com";
+        console.log("Using render backend:", API_BASE_URL);
     }
 }
 
