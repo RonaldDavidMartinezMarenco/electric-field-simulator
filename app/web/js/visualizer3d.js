@@ -55,6 +55,19 @@ class Visualizer3D {
         this.renderer.setSize(width, height);
         this.renderer.setPixelRatio(window.devicePixelRatio);
 
+        this.updateRendererSize = () => {
+            const container = this.canvas.parentElement;
+            const width = container.clientWidth || window.innerWidth;
+            const height = container.clientHeight || window.innerHeight;
+
+            this.renderer.setSize(width, height);
+            this.camera.aspect = width / height;
+            this.camera.updateProjectionMatrix();
+        };
+
+        // Actualizar al cambiar tamaño de la ventana
+        window.addEventListener("resize", this.updateRendererSize);
+
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         this.scene.add(ambientLight);
 
@@ -148,6 +161,11 @@ class Visualizer3D {
         if (options.showPotentialSurface && this.data.field.potential) {
             this.drawPotentialSurface();
         }
+
+        setTimeout(() => {
+            this.updateRendererSize();
+            this.renderer.render(this.scene, this.camera);
+        }, 150);
 
         console.log("✅ 3D Render complete");
     }
@@ -444,56 +462,56 @@ class Visualizer3D {
         }
 
         // Fallback: point-sampled isosurface (fast to compute, similar to the version you had)
-       // FALLBACK: sample points near isovalues and draw as Points
-// If user provided a customIsoValue (slider, normalized 0..1) -> draw single iso at that value
-const custom = (this.currentOptions && this.currentOptions.customIsoValue !== undefined);
+        // FALLBACK: sample points near isovalues and draw as Points
+        // If user provided a customIsoValue (slider, normalized 0..1) -> draw single iso at that value
+        const custom = (this.currentOptions && this.currentOptions.customIsoValue !== undefined);
 
-if (custom) {
-    // map normalized slider (0..1) to actual potential value
-    const isoNormalized = this.currentOptions.customIsoValue; // 0..1
-    const threshold = minV + (maxV - minV) * isoNormalized;
+        if (custom) {
+            // map normalized slider (0..1) to actual potential value
+            const isoNormalized = this.currentOptions.customIsoValue; // 0..1
+            const threshold = minV + (maxV - minV) * isoNormalized;
 
-    const colorParam = 0.5; // single mid color (you can change)
-    const vertices = [];
-    const colors = [];
-    const dx = (grid.xmax - grid.xmin) / (grid.nx - 1);
-    const dy = (grid.ymax - grid.ymin) / (grid.ny - 1);
-    const dz = (grid.zmax - grid.zmin) / (grid.nz - 1);
+            const colorParam = 0.5; // single mid color (you can change)
+            const vertices = [];
+            const colors = [];
+            const dx = (grid.xmax - grid.xmin) / (grid.nx - 1);
+            const dy = (grid.ymax - grid.ymin) / (grid.ny - 1);
+            const dz = (grid.zmax - grid.zmin) / (grid.nz - 1);
 
-    for (let k = 0; k < grid.nz; k++) {
-        for (let j = 0; j < grid.ny; j++) {
-            for (let i = 0; i < grid.nx; i++) {
-                const v = potential[k][j][i];
-                if (!Number.isFinite(v)) continue;
-                if (Math.abs(v - threshold) < (Math.abs(threshold) * 0.08 + 1e-6)) {
-                    const x = grid.xmin + i * dx;
-                    const y = grid.ymin + j * dy;
-                    const z = grid.zmin + k * dz;
-                    vertices.push(x, y, z);
-                    const c = new THREE.Color().setHSL(colorParam, 0.8, 0.5);
-                    colors.push(c.r, c.g, c.b);
+            for (let k = 0; k < grid.nz; k++) {
+                for (let j = 0; j < grid.ny; j++) {
+                    for (let i = 0; i < grid.nx; i++) {
+                        const v = potential[k][j][i];
+                        if (!Number.isFinite(v)) continue;
+                        if (Math.abs(v - threshold) < (Math.abs(threshold) * 0.08 + 1e-6)) {
+                            const x = grid.xmin + i * dx;
+                            const y = grid.ymin + j * dy;
+                            const z = grid.zmin + k * dz;
+                            vertices.push(x, y, z);
+                            const c = new THREE.Color().setHSL(colorParam, 0.8, 0.5);
+                            colors.push(c.r, c.g, c.b);
+                        }
+                    }
                 }
             }
-        }
-    }
 
-    if (vertices.length > 0) {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
-        const material = new THREE.PointsMaterial({
-            size: Math.max(0.02, Math.min(0.06, (grid.xmax - grid.xmin) / 40)),
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.7
-        });
-        const points = new THREE.Points(geometry, material);
-        this._isoObjects.push(points);
-        this.scene.add(points);
-    }
-    // done single iso from slider
-    return;
-}
+            if (vertices.length > 0) {
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+                const material = new THREE.PointsMaterial({
+                    size: Math.max(0.02, Math.min(0.06, (grid.xmax - grid.xmin) / 40)),
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const points = new THREE.Points(geometry, material);
+                this._isoObjects.push(points);
+                this.scene.add(points);
+            }
+            // done single iso from slider
+            return;
+        }
     }
 
     // ------------------
